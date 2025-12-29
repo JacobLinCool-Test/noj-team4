@@ -375,19 +375,6 @@ export class AuthService {
       );
     }
 
-    if (
-      tokenRecord.expiresAt.getTime() < Date.now() ||
-      tokenRecord.userId !== payload.sub
-    ) {
-      await this.prisma.refreshToken.update({
-        where: { id: tokenRecord.id },
-        data: { revokedAt: new Date() },
-      });
-      throw new UnauthorizedException(
-        this.buildErrorPayload('INVALID_REFRESH_TOKEN', meta.locale),
-      );
-    }
-
     const user = await this.prisma.user.findUnique({
       where: { id: tokenRecord.userId },
     });
@@ -766,18 +753,21 @@ export class AuthService {
     const token = randomBytes(32).toString('hex');
     const tokenHash = this.hashToken(token);
 
-    await this.prisma.emailVerificationToken.deleteMany({
-      where: { userId: user.id },
-    });
-    await this.prisma.emailVerificationToken.create({
-      data: {
-        userId: user.id,
-        tokenHash,
-        expiresAt: new Date(Date.now() + this.emailVerifyTtlSeconds * 1000),
-        ip: meta.ip,
-        userAgent: meta.userAgent,
-      },
-    });
+    // Use transaction to prevent race condition when creating verification token
+    await this.prisma.$transaction([
+      this.prisma.emailVerificationToken.deleteMany({
+        where: { userId: user.id },
+      }),
+      this.prisma.emailVerificationToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt: new Date(Date.now() + this.emailVerifyTtlSeconds * 1000),
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+        },
+      }),
+    ]);
 
     return token;
   }
@@ -789,18 +779,21 @@ export class AuthService {
     const token = randomBytes(32).toString('hex');
     const tokenHash = this.hashToken(token);
 
-    await this.prisma.passwordResetToken.deleteMany({
-      where: { userId: user.id },
-    });
-    await this.prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        tokenHash,
-        expiresAt: new Date(Date.now() + this.passwordResetTtlSeconds * 1000),
-        ip: meta.ip,
-        userAgent: meta.userAgent,
-      },
-    });
+    // Use transaction to prevent race condition when creating password reset token
+    await this.prisma.$transaction([
+      this.prisma.passwordResetToken.deleteMany({
+        where: { userId: user.id },
+      }),
+      this.prisma.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt: new Date(Date.now() + this.passwordResetTtlSeconds * 1000),
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+        },
+      }),
+    ]);
 
     return token;
   }
@@ -921,40 +914,51 @@ export class AuthService {
     meta: RequestMeta,
   ) {
     const hash = await argon2.hash(token);
-    await this.prisma.refreshToken.create({
-      data: {
-        userId,
-        tokenHash: hash,
-        expiresAt: new Date(Date.now() + this.refreshTtlSeconds * 1000),
-        ip: meta.ip,
-        userAgent: meta.userAgent,
-      },
-    });
-
     const now = new Date();
-    await this.prisma.refreshToken.deleteMany({
-      where: {
-        userId,
-        OR: [{ expiresAt: { lt: now } }, { revokedAt: { not: null } }],
-      },
-    });
+    const expiresAt = new Date(Date.now() + this.refreshTtlSeconds * 1000);
 
-    const activeTokens = await this.prisma.refreshToken.findMany({
-      where: { userId, revokedAt: null },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true },
-    });
-
-    const maxActiveTokens = 5;
-    if (activeTokens.length > maxActiveTokens) {
-      const revokeIds = activeTokens
-        .slice(0, activeTokens.length - maxActiveTokens)
-        .map((t) => t.id);
-      await this.prisma.refreshToken.updateMany({
-        where: { id: { in: revokeIds } },
-        data: { revokedAt: now },
+    // Use transaction to ensure atomicity and prevent race conditions
+    await this.prisma.$transaction(async (tx) => {
+      // First, delete expired/revoked tokens to clean up
+      await tx.refreshToken.deleteMany({
+        where: {
+          userId,
+          OR: [{ expiresAt: { lt: now } }, { revokedAt: { not: null } }],
+        },
       });
-    }
+
+      // Then, create new token
+      await tx.refreshToken.create({
+        data: {
+          userId,
+          tokenHash: hash,
+          expiresAt,
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+        },
+      });
+
+      // Query active tokens (including the newly created one)
+      const activeTokens = await tx.refreshToken.findMany({
+        where: { userId, revokedAt: null, expiresAt: { gte: now } },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+
+      // Revoke oldest tokens if limit exceeded
+      // After creating the new token, if we have more than 5 active tokens,
+      // we revoke the oldest ones to maintain the limit
+      const maxActiveTokens = 5;
+      if (activeTokens.length > maxActiveTokens) {
+        const revokeIds = activeTokens
+          .slice(0, activeTokens.length - maxActiveTokens)
+          .map((t) => t.id);
+        await tx.refreshToken.updateMany({
+          where: { id: { in: revokeIds } },
+          data: { revokedAt: now },
+        });
+      }
+    });
   }
 
   private parseTtlSeconds(
