@@ -919,7 +919,15 @@ export class AuthService {
 
     // Use transaction to ensure atomicity and prevent race conditions
     await this.prisma.$transaction(async (tx) => {
-      // Create new token
+      // First, delete expired/revoked tokens to clean up
+      await tx.refreshToken.deleteMany({
+        where: {
+          userId,
+          OR: [{ expiresAt: { lt: now } }, { revokedAt: { not: null } }],
+        },
+      });
+
+      // Then, create new token
       await tx.refreshToken.create({
         data: {
           userId,
@@ -930,15 +938,7 @@ export class AuthService {
         },
       });
 
-      // Delete expired/revoked tokens
-      await tx.refreshToken.deleteMany({
-        where: {
-          userId,
-          OR: [{ expiresAt: { lt: now } }, { revokedAt: { not: null } }],
-        },
-      });
-
-      // Query active tokens (excluding just-deleted ones)
+      // Query active tokens (including the newly created one)
       const activeTokens = await tx.refreshToken.findMany({
         where: { userId, revokedAt: null, expiresAt: { gte: now } },
         orderBy: { createdAt: 'asc' },
@@ -946,6 +946,8 @@ export class AuthService {
       });
 
       // Revoke oldest tokens if limit exceeded
+      // After creating the new token, if we have more than 5 active tokens,
+      // we revoke the oldest ones to maintain the limit
       const maxActiveTokens = 5;
       if (activeTokens.length > maxActiveTokens) {
         const revokeIds = activeTokens
