@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+/* JetBrains Mono for code editor */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --font-geist-sans: "Noto Sans TC", "Noto Sans", "PingFang TC", "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif;
+  --font-geist-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans);
+}
+
+/* Highlight.js theme for code blocks (GitHub Dark style) */
+.markdown-content pre code.hljs {
+  color: #c9d1d9;
+}
+
+.markdown-content pre code .hljs-doctag,
+.markdown-content pre code .hljs-keyword,
+.markdown-content pre code .hljs-meta .hljs-keyword,
+.markdown-content pre code .hljs-template-tag,
+.markdown-content pre code .hljs-template-variable,
+.markdown-content pre code .hljs-type,
+.markdown-content pre code .hljs-variable.language_ {
+  color: #ff7b72;
+}
+
+.markdown-content pre code .hljs-title,
+.markdown-content pre code .hljs-title.class_,
+.markdown-content pre code .hljs-title.class_.inherited__,
+.markdown-content pre code .hljs-title.function_ {
+  color: #d2a8ff;
+}
+
+.markdown-content pre code .hljs-attr,
+.markdown-content pre code .hljs-attribute,
+.markdown-content pre code .hljs-literal,
+.markdown-content pre code .hljs-meta,
+.markdown-content pre code .hljs-number,
+.markdown-content pre code .hljs-operator,
+.markdown-content pre code .hljs-variable,
+.markdown-content pre code .hljs-selector-attr,
+.markdown-content pre code .hljs-selector-class,
+.markdown-content pre code .hljs-selector-id {
+  color: #79c0ff;
+}
+
+.markdown-content pre code .hljs-regexp,
+.markdown-content pre code .hljs-string,
+.markdown-content pre code .hljs-meta .hljs-string {
+  color: #a5d6ff;
+}
+
+.markdown-content pre code .hljs-built_in,
+.markdown-content pre code .hljs-symbol {
+  color: #ffa657;
+}
+
+.markdown-content pre code .hljs-comment,
+.markdown-content pre code .hljs-code,
+.markdown-content pre code .hljs-formula {
+  color: #8b949e;
+}
+
+.markdown-content pre code .hljs-name,
+.markdown-content pre code .hljs-quote,
+.markdown-content pre code .hljs-selector-tag,
+.markdown-content pre code .hljs-selector-pseudo {
+  color: #7ee787;
+}
+
+.markdown-content pre code .hljs-subst {
+  color: #c9d1d9;
+}
+
+.markdown-content pre code .hljs-section {
+  color: #1f6feb;
+  font-weight: bold;
+}
+
+.markdown-content pre code .hljs-bullet {
+  color: #f2cc60;
+}
+
+.markdown-content pre code .hljs-emphasis {
+  color: #c9d1d9;
+  font-style: italic;
+}
+
+.markdown-content pre code .hljs-strong {
+  color: #c9d1d9;
+  font-weight: bold;
+}
+
+.markdown-content pre code .hljs-addition {
+  color: #aff5b4;
+  background-color: #033a16;
+}
+
+.markdown-content pre code .hljs-deletion {
+  color: #ffdcd7;
+  background-color: #67060c;
+}

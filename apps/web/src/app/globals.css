@@ -1,0 +1,284 @@
+@import "tailwindcss";
+
+/* JetBrains Mono for code editor */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --font-geist-sans: "Noto Sans TC", "Noto Sans", "PingFang TC", "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif;
+  --font-geist-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans);
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(30, 93, 143, 0.12), transparent);
+  transform: translateX(-100%);
+  animation: shimmer 1.6s infinite;
+}
+
+/* Prevent flash during hydration */
+.hydration-safe {
+  animation: hydration-fade-in 0.15s ease-out;
+}
+
+@keyframes hydration-fade-in {
+  from {
+    opacity: 0.97;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+
+/* Highlight.js theme for code blocks (GitHub Dark style) */
+/* Use .markdown-content prefix for higher specificity over Tailwind utilities */
+.markdown-content pre code.hljs {
+  color: #c9d1d9;
+}
+
+.markdown-content pre code .hljs-doctag,
+.markdown-content pre code .hljs-keyword,
+.markdown-content pre code .hljs-meta .hljs-keyword,
+.markdown-content pre code .hljs-template-tag,
+.markdown-content pre code .hljs-template-variable,
+.markdown-content pre code .hljs-type,
+.markdown-content pre code .hljs-variable.language_ {
+  color: #ff7b72;
+}
+
+.markdown-content pre code .hljs-title,
+.markdown-content pre code .hljs-title.class_,
+.markdown-content pre code .hljs-title.class_.inherited__,
+.markdown-content pre code .hljs-title.function_ {
+  color: #d2a8ff;
+}
+
+.markdown-content pre code .hljs-attr,
+.markdown-content pre code .hljs-attribute,
+.markdown-content pre code .hljs-literal,
+.markdown-content pre code .hljs-meta,
+.markdown-content pre code .hljs-number,
+.markdown-content pre code .hljs-operator,
+.markdown-content pre code .hljs-variable,
+.markdown-content pre code .hljs-selector-attr,
+.markdown-content pre code .hljs-selector-class,
+.markdown-content pre code .hljs-selector-id {
+  color: #79c0ff;
+}
+
+.markdown-content pre code .hljs-regexp,
+.markdown-content pre code .hljs-string,
+.markdown-content pre code .hljs-meta .hljs-string {
+  color: #a5d6ff;
+}
+
+.markdown-content pre code .hljs-built_in,
+.markdown-content pre code .hljs-symbol {
+  color: #ffa657;
+}
+
+.markdown-content pre code .hljs-comment,
+.markdown-content pre code .hljs-code,
+.markdown-content pre code .hljs-formula {
+  color: #8b949e;
+}
+
+.markdown-content pre code .hljs-name,
+.markdown-content pre code .hljs-quote,
+.markdown-content pre code .hljs-selector-tag,
+.markdown-content pre code .hljs-selector-pseudo {
+  color: #7ee787;
+}
+
+.markdown-content pre code .hljs-subst {
+  color: #c9d1d9;
+}
+
+.markdown-content pre code .hljs-section {
+  color: #1f6feb;
+  font-weight: bold;
+}
+
+.markdown-content pre code .hljs-bullet {
+  color: #f2cc60;
+}
+
+.markdown-content pre code .hljs-emphasis {
+  color: #c9d1d9;
+  font-style: italic;
+}
+
+.markdown-content pre code .hljs-strong {
+  color: #c9d1d9;
+  font-weight: bold;
+}
+
+.markdown-content pre code .hljs-addition {
+  color: #aff5b4;
+  background-color: #033a16;
+}
+
+.markdown-content pre code .hljs-deletion {
+  color: #ffdcd7;
+  background-color: #67060c;
+}
+
+/* AI Chat Markdown - Compact styles for chat bubbles */
+.ai-chat-markdown h1,
+.ai-chat-markdown h2,
+.ai-chat-markdown h3,
+.ai-chat-markdown h4 {
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.ai-chat-markdown h1:first-child,
+.ai-chat-markdown h2:first-child,
+.ai-chat-markdown h3:first-child,
+.ai-chat-markdown h4:first-child {
+  margin-top: 0;
+}
+
+.ai-chat-markdown p {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.ai-chat-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.ai-chat-markdown ul,
+.ai-chat-markdown ol {
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
+  margin-left: 1rem;
+}
+
+.ai-chat-markdown li {
+  margin-bottom: 0.125rem;
+}
+
+.ai-chat-markdown pre {
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.ai-chat-markdown code:not(pre code) {
+  padding: 0.125rem 0.25rem;
+  font-size: 0.75rem;
+}
+
+.ai-chat-markdown blockquote {
+  margin: 0.5rem 0;
+  padding: 0.25rem 0.5rem;
+}
+
+.ai-chat-markdown table {
+  font-size: 0.75rem;
+}
+
+.ai-chat-markdown th,
+.ai-chat-markdown td {
+  padding: 0.25rem 0.5rem;
+}
+
+.ai-chat-markdown hr {
+  margin: 0.5rem 0;
+}
+
+/* React Resizable Panels */
+[data-panel-group] {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+[data-panel-group-direction="horizontal"] {
+  flex-direction: row;
+}
+
+[data-panel-group-direction="vertical"] {
+  flex-direction: column;
+}
+
+[data-panel] {
+  overflow: hidden;
+}
+
+[data-resize-handle] {
+  flex-shrink: 0;
+  touch-action: none;
+  user-select: none;
+}
+
+[data-resize-handle-active],
+[data-resize-handle]:hover {
+  background-color: #60a5fa !important;
+}
+
+[data-resize-handle-active] {
+  background-color: #3b82f6 !important;
+}
+
+/* Hide footer in IDE mode */
+body.hide-footer footer {
+  display: none !important;
+}

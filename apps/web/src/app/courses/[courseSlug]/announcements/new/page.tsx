@@ -1,0 +1,10 @@
+import { NewAnnouncementPageContent } from "./page-content";
+
+type Params = Promise<{ courseSlug: string }>;
+
+export default async function NewAnnouncementPage({ params }: { params: Params }) {
+  const resolved = await params;
+  const courseSlug = resolved.courseSlug;
+
+  return <NewAnnouncementPageContent courseSlug={courseSlug} />;
+}

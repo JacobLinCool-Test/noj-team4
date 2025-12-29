@@ -1,0 +1,39 @@
+{
+  "name": "noj-team4",
+  "private": true,
+  "version": "0.1.0",
+  "description": "NOJ online judge system - Team 4 monorepo",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api start:dev",
+    "dev:infra": "docker compose -f infra/docker-compose.dev.yml up",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "pnpm@10.0.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "argon2",
+      "msgpackr-extract",
+      "prisma",
+      "sharp",
+      "unrs-resolver"
+    ],
+    "overrides": {
+      "jws": ">=3.2.3",
+      "body-parser": ">=2.2.1"
+    }
+  },
+  "dependencies": {
+    "@types/archiver": "^7.0.0",
+    "archiver": "^7.0.1",
+    "ioredis": "^5.8.2"
+  }
+}

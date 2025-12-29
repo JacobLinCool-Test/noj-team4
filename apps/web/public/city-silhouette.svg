@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 240" preserveAspectRatio="xMidYMax slice">
+  <defs>
+    <linearGradient id="windowGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffeeba;stop-opacity:0.9"/>
+      <stop offset="100%" style="stop-color:#ffdd77;stop-opacity:0.4"/>
+    </linearGradient>
+    <linearGradient id="blueWindow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#aaddff;stop-opacity:0.8"/>
+      <stop offset="100%" style="stop-color:#0088cc;stop-opacity:0.3"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background Layer (Distant Buildings) -->
+  <g fill="#001825" opacity="0.1">
+    <path d="M0 240 V150 L30 140 L60 150 L90 130 L120 150 V240 H0 Z" />
+    <path d="M150 240 V160 L180 140 L210 160 V240 H150 Z" />
+    <path d="M250 240 V120 L280 100 L310 120 V240 H250 Z" />
+    <path d="M350 240 V170 H400 V150 H430 V240 H350 Z" />
+    <path d="M500 240 V130 L550 110 L600 130 V240 H500 Z" />
+    <path d="M700 240 V140 H750 V120 H780 V240 H700 Z" />
+    <path d="M850 240 V160 L900 140 L950 160 V240 H850 Z" />
+    <path d="M1000 240 V150 H1050 V130 H1080 V240 H1000 Z" />
+    <path d="M1150 240 V120 L1200 100 L1250 120 V240 H1150 Z" />
+    <path d="M1300 240 V160 H1350 V140 H1380 V240 H1300 Z" />
+  </g>
+
+  <!-- Midground Layer (Secondary Buildings) -->
+  <g fill="#010c14" opacity="0.2">
+    <rect x="20" y="180" width="50" height="60" />
+    <rect x="80" y="160" width="40" height="80" />
+    <rect x="180" y="140" width="60" height="100" />
+    <polygon points="180,140 210,120 240,140" /> <!-- Roof -->
+    
+    <rect x="300" y="150" width="80" height="90" />
+    <rect x="320" y="130" width="40" height="20" />
+    
+    <rect x="450" y="120" width="50" height="120" />
+    <rect x="460" y="100" width="30" height="20" />
+    <rect x="470" y="80" width="10" height="20" /> <!-- Antenna base -->
+
+    <rect x="600" y="160" width="90" height="80" />
+    <rect x="620" y="150" width="50" height="10" />
+
+    <rect x="800" y="130" width="60" height="110" />
+    <polygon points="800,130 830,110 860,130" />
+
+    <rect x="950" y="140" width="70" height="100" />
+    <rect x="970" y="120" width="30" height="20" />
+
+    <rect x="1100" y="170" width="80" height="70" />
+    <rect x="1250" y="150" width="60" height="90" />
+    <rect x="1260" y="130" width="40" height="20" />
+  </g>
+
+  <!-- Foreground Layer (Main Skyline) -->
+  <g fill="#000508" opacity="0.3">
+    <rect x="0" y="238" width="1440" height="2" /> <!-- Ground -->
+
+    <!-- Left Block -->
+    <rect x="-10" y="190" width="60" height="50" />
+    
+    <!-- Tower 1 -->
+    <rect x="110" y="100" width="50" height="140" />
+    <rect x="115" y="80" width="40" height="20" />
+    <line x1="135" y1="80" x2="135" y2="40" stroke="#000508" stroke-width="3" />
+
+    <!-- Complex 2 -->
+    <rect x="220" y="160" width="70" height="80" />
+    <rect x="230" y="150" width="50" height="10" />
+    <rect x="240" y="140" width="30" height="10" />
+
+    <!-- The Spire -->
+    <rect x="380" y="110" width="60" height="130" />
+    <polygon points="380,110 410,50 440,110" /> <!-- Spire Body -->
+    <line x1="410" y1="50" x2="410" y2="20" stroke="#000508" stroke-width="2" />
+
+    <!-- Wide Office -->
+    <rect x="520" y="170" width="100" height="70" />
+    <rect x="530" y="160" width="80" height="10" />
+
+    <!-- Cyber Tower -->
+    <rect x="680" y="90" width="60" height="150" />
+    <rect x="670" y="120" width="10" height="80" /> <!-- Side attachment -->
+    <rect x="740" y="120" width="10" height="80" /> <!-- Side attachment -->
+    <polygon points="680,90 710,70 740,90" />
+    <line x1="710" y1="70" x2="710" y2="30" stroke="#000508" stroke-width="2" />
+
+    <!-- Tech Hub -->
+    <rect x="850" y="140" width="80" height="100" />
+    <rect x="860" y="130" width="60" height="10" />
+    <rect x="870" y="120" width="40" height="10" />
+
+    <!-- Needle Tower -->
+    <rect x="1000" y="120" width="40" height="120" />
+    <polygon points="1000,120 1020,60 1040,120" />
+    <line x1="1020" y1="60" x2="1020" y2="10" stroke="#000508" stroke-width="2" />
+
+    <!-- Right Block -->
+    <rect x="1150" y="160" width="70" height="80" />
+    <rect x="1300" y="180" width="100" height="60" />
+    <rect x="1400" y="200" width="50" height="40" />
+  </g>
+
+  <!-- Windows & Details -->
+  <g fill="url(#windowGlow)" opacity="0.15">
+    <!-- Tower 1 Windows -->
+    <rect x="120" y="110" width="30" height="2" />
+    <rect x="120" y="120" width="30" height="2" />
+    <rect x="120" y="130" width="30" height="2" />
+    <rect x="120" y="160" width="30" height="40" opacity="0.3" />
+
+    <!-- Spire Windows -->
+    <rect x="395" y="120" width="30" height="100" opacity="0.2" />
+    <rect x="400" y="80" width="20" height="2" />
+    <rect x="400" y="90" width="20" height="2" />
+
+    <!-- Wide Office Grid -->
+    <g opacity="0.5">
+      <rect x="530" y="180" width="5" height="5" /> <rect x="540" y="180" width="5" height="5" /> <rect x="550" y="180" width="5" height="5" />
+      <rect x="530" y="190" width="5" height="5" /> <rect x="540" y="190" width="5" height="5" /> <rect x="550" y="190" width="5" height="5" />
+      <rect x="580" y="180" width="20" height="40" />
+    </g>
+
+    <!-- Cyber Tower Lights -->
+    <rect x="690" y="100" width="40" height="2" />
+    <rect x="690" y="110" width="40" height="2" />
+    <rect x="705" y="130" width="10" height="80" opacity="0.6" />
+
+    <!-- Tech Hub -->
+    <rect x="860" y="150" width="60" height="5" opacity="0.4" />
+    <rect x="860" y="170" width="60" height="5" opacity="0.4" />
+
+    <!-- Needle Tower -->
+    <rect x="1015" y="80" width="10" height="150" opacity="0.5" />
+  </g>
+  
+  <g fill="url(#windowGlow)" opacity="0.2">
+     <!-- Formerly blue accents, now standard gold/yellow -->
+     <rect x="230" y="170" width="10" height="20" />
+     <rect x="250" y="170" width="10" height="20" />
+     <rect x="1160" y="170" width="50" height="2" />
+     <rect x="1160" y="180" width="50" height="2" />
+  </g>
+
+  <!-- Warning Beacons (Animated) -->
+  <g fill="#ff3333" filter="url(#glow)">
+    <circle cx="135" cy="40" r="2">
+      <animate attributeName="opacity" values="1;0.3;1" dur="3s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="410" cy="20" r="2">
+      <animate attributeName="opacity" values="1;0.3;1" dur="4s" repeatCount="indefinite" begin="1s"/>
+    </circle>
+    <circle cx="710" cy="30" r="2">
+      <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite" begin="0.5s"/>
+    </circle>
+    <circle cx="1020" cy="10" r="2">
+      <animate attributeName="opacity" values="1;0.3;1" dur="5s" repeatCount="indefinite" begin="2s"/>
+    </circle>
+  </g>
+</svg>

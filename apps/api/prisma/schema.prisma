@@ -1,0 +1,1137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                        Int                      @id @default(autoincrement())
+  username                  String                   @unique
+  email                     String                   @unique
+  passwordHash              String
+  role                      UserRole                 @default(USER)
+  status                    UserStatus               @default(ACTIVE)
+  emailVerifiedAt           DateTime?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  nickname                  String?
+  bio                       String?
+  avatarUrl                 String?
+  preferences               Json?
+  auditLogs                 AuditLog[]
+  createdCourses            Course[]                 @relation("CourseCreator")
+  teachingCourses           Course[]                 @relation("CourseTeacher")
+  courseMemberships         CourseMember[]
+  verificationTokens        EmailVerificationToken[]
+  passwordResetTokens       PasswordResetToken[]
+  emailSendLogs             EmailSendLog[]
+  refreshTokens             RefreshToken[]
+  announcements             Announcement[]
+  problems                  Problem[]
+  createdHomeworks          Homework[]
+  submissions               Submission[]
+  uploadedTestdata          ProblemTestdata[]
+  apiTokens                 ApiToken[]
+  addedCourseProblems       CourseProblem[]
+  aiConversations           AiConversation[]
+  receivedCourseInvitations CourseInvitation[]       @relation("CourseInvitationsReceived")
+  sentCourseInvitations     CourseInvitation[]       @relation("CourseInvitationsSent")
+  submittedJoinRequests     CourseJoinRequest[]      @relation("JoinRequestsSubmitted")
+  reviewedJoinRequests      CourseJoinRequest[]      @relation("JoinRequestsReviewed")
+  copycatReports            CopycatReport[]
+  copycatPairsLeft          CopycatPair[]            @relation("CopycatPairLeft")
+  copycatPairsRight         CopycatPair[]            @relation("CopycatPairRight")
+  examCodes                 ExamCode[]               @relation("ExamCodeStudent")
+  createdExams              Exam[]                   @relation("ExamCreator")
+  adminActionLogs           AdminActionLog[]
+  blockedSubmissions        BlockedSubmission[]
+}
+
+model RefreshToken {
+  id          Int       @id @default(autoincrement())
+  tokenDigest String?   @unique
+  tokenHash   String    @unique
+  userId      Int
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id         Int         @id @default(autoincrement())
+  action     AuditAction
+  userId     Int?
+  ip         String?
+  userAgent  String?
+  result     AuditResult @default(SUCCESS)
+  detail     Json?
+  createdAt  DateTime    @default(now())
+  courseId   Int?
+  homeworkId Int?
+  problemId  Int?
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Course {
+  id             Int                  @id @default(autoincrement())
+  slug           String?              @unique
+  code           String
+  name           String
+  term           String
+  description    String?
+  status         CourseStatus         @default(ACTIVE)
+  enrollmentType CourseEnrollmentType @default(INVITE_ONLY)
+  isPublicListed Boolean              @default(true)
+  joinToken      String?              @unique
+  teacherId      Int?
+  createdById    Int?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  createdBy      User?                @relation("CourseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  teacher        User?                @relation("CourseTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  members        CourseMember[]
+  invitations    CourseInvitation[]
+  joinRequests   CourseJoinRequest[]
+  announcements  Announcement[]
+  homeworks      Homework[]
+  problems       CourseProblem[]
+  submissions    Submission[]
+  copycatReports CopycatReport[]
+  exams          Exam[]
+
+  @@unique([code, term])
+  @@index([code])
+  @@index([term])
+  @@index([slug])
+}
+
+model CourseMember {
+  courseId     Int
+  userId       Int
+  roleInCourse CourseRole
+  joinedAt     DateTime   @default(now())
+  leftAt       DateTime?
+  course       Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, userId])
+  @@index([userId])
+  @@index([courseId, roleInCourse])
+}
+
+model CourseInvitation {
+  id          String                 @id @default(cuid())
+  courseId    Int
+  email       String
+  inviteeId   Int?
+  status      CourseInvitationStatus @default(PENDING)
+  invitedById Int?
+  createdAt   DateTime               @default(now())
+  respondedAt DateTime?
+
+  course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  invitee   User?  @relation("CourseInvitationsReceived", fields: [inviteeId], references: [id], onDelete: SetNull)
+  invitedBy User?  @relation("CourseInvitationsSent", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@unique([courseId, email])
+  @@index([email, status])
+  @@index([inviteeId, status])
+  @@index([courseId, status])
+}
+
+model CourseJoinRequest {
+  id           String                  @id @default(cuid())
+  courseId     Int
+  userId       Int?
+  status       CourseJoinRequestStatus @default(PENDING)
+  reviewedById Int?
+  createdAt    DateTime                @default(now())
+  reviewedAt   DateTime?
+
+  course     Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user       User?  @relation("JoinRequestsSubmitted", fields: [userId], references: [id], onDelete: SetNull)
+  reviewedBy User?  @relation("JoinRequestsReviewed", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([courseId, userId])
+  @@index([courseId, status])
+  @@index([userId, status])
+}
+
+model EmailVerificationToken {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EmailSendLog {
+  id             Int             @id @default(autoincrement())
+  type           EmailSendType
+  status         EmailSendStatus @default(SENT)
+  recipientEmail String
+  subject        String?
+  provider       String?
+  messageId      String?
+  error          String?
+  ip             String?
+  userAgent      String?
+  userId         Int?
+  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt      DateTime        @default(now())
+
+  @@index([recipientEmail, createdAt])
+  @@index([type, createdAt])
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}
+
+model ApiToken {
+  id         Int          @id @default(autoincrement())
+  name       String
+  tokenHash  String       @unique
+  scopes     TokenScope[]
+  userId     Int
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastUsedAt DateTime?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime     @default(now())
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+
+  @@index([userId])
+  @@index([userId, revokedAt])
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  REGISTER
+  VERIFY_EMAIL
+  RESEND_VERIFICATION_EMAIL
+  REQUEST_PASSWORD_RESET
+  RESET_PASSWORD
+  COURSE_CREATE
+  COURSE_UPDATE
+  COURSE_ARCHIVE
+  COURSE_DELETE
+  COURSE_MEMBER_ADD
+  COURSE_MEMBER_ROLE_CHANGE
+  COURSE_MEMBER_REMOVE
+  COURSE_JOIN_PUBLIC
+  COURSE_JOIN_BY_LINK
+  COURSE_LEAVE
+  COURSE_JOIN_REQUEST_CREATE
+  COURSE_JOIN_REQUEST_APPROVE
+  COURSE_JOIN_REQUEST_REJECT
+  SUBMISSION_CREATE
+  SUBMISSION_REJUDGE
+  SUBMISSION_RUN_TEST
+  COURSE_INVITATION_CREATE
+  COURSE_INVITATION_ACCEPT
+  COURSE_INVITATION_REJECT
+  COURSE_INVITATION_CANCEL
+  EXAM_CREATE
+  EXAM_UPDATE
+  EXAM_DELETE
+  EXAM_LOGIN
+  EXAM_SUBMIT
+}
+
+enum AuditResult {
+  SUCCESS
+  FAILURE
+}
+
+enum EmailSendType {
+  GENERIC
+  VERIFY_EMAIL
+  PASSWORD_RESET
+}
+
+enum EmailSendStatus {
+  SENT
+  SKIPPED
+  FAILED
+}
+
+enum CourseStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum CourseEnrollmentType {
+  INVITE_ONLY
+  APPROVAL
+  BY_LINK
+  PUBLIC
+}
+
+enum CourseJoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CourseRole {
+  TEACHER
+  TA
+  STUDENT
+}
+
+enum CourseInvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum AnnouncementScope {
+  COURSE
+  GLOBAL
+}
+
+enum ProgrammingLanguage {
+  C
+  CPP
+  JAVA
+  PYTHON
+}
+
+enum ProblemVisibility {
+  PUBLIC // 公開（會顯示在公開題目列表）
+  UNLISTED // 不公開（不在公開列表，但可被課程收錄）
+  PRIVATE // 私人（完全私密，僅擁有者可見）
+}
+
+enum ProblemDifficulty {
+  UNKNOWN
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum SubmissionStatus {
+  PENDING
+  RUNNING
+  AC
+  PA // Partially Accepted - 部分通過（部分測資點無法通過）
+  WA
+  CE
+  TLE
+  MLE
+  RE
+  OLE
+  SA // Static Analysis Failed - 靜態分析失敗
+  JUDGE_ERROR
+}
+
+enum SubmissionType {
+  SINGLE_FILE // 單一檔案提交
+  MULTI_FILE // 多檔案專案提交 (zip)
+  FUNCTION_ONLY // 僅實作函式
+}
+
+enum PipelineStageType {
+  COMPILE // 編譯階段
+  STATIC_ANALYSIS // 靜態分析階段
+  EXECUTE // 執行測試案例階段
+  CHECK // 檢查輸出階段（支援自訂 checker）
+  SCORING // 計分階段
+  INTERACTIVE // 互動式評測階段
+}
+
+enum TokenScope {
+  READ_USER
+  READ_COURSES
+  WRITE_COURSES
+  READ_PROBLEMS
+  WRITE_PROBLEMS
+  READ_SUBMISSIONS
+  WRITE_SUBMISSIONS
+}
+
+enum AiProvider {
+  OPENAI
+  GEMINI
+}
+
+enum AiFeature {
+  ASSISTANT
+  PROBLEM_CREATOR
+  TESTDATA_GENERATOR
+  TRANSLATOR
+  CODE_SAFETY_CHECK
+}
+
+enum BlockedSourceType {
+  SUBMIT
+  TEST
+  EXAM_SUBMIT
+}
+
+enum TranslationStatus {
+  NONE      // 未翻譯
+  PENDING   // 翻譯中
+  COMPLETED // 翻譯完成
+  FAILED    // 翻譯失敗
+}
+
+enum ReasoningEffort {
+  NONE
+  MINIMAL
+  LOW
+  MEDIUM
+  HIGH
+  XHIGH
+}
+
+enum AiMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum CopycatStatus {
+  PENDING // 排隊中
+  RUNNING // 執行中
+  SUCCESS // 成功
+  FAILED // 失敗
+}
+
+model Announcement {
+  id        Int               @id @default(autoincrement())
+  scope     AnnouncementScope @default(COURSE)
+  courseId  Int?
+  title     String
+  content   String
+  isPinned  Boolean           @default(false)
+  authorId  Int?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  course    Course?           @relation(fields: [courseId], references: [id])
+  author    User?             @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([courseId, isPinned, createdAt])
+}
+
+model Problem {
+  id String @id @default(cuid())
+
+  /// 顯示用題號：1 碼小寫英文字母 + 3 碼數字，由後端生成（例：a123）
+  displayId String @unique
+
+  /// 題目擁有者（建立者）
+  owner   User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerId Int?
+
+  /// 舊系統相容用 slug（已不再用於 URL），保留為可選欄位
+  slug String? @unique
+
+  visibility ProblemVisibility @default(PUBLIC)
+  difficulty ProblemDifficulty @default(UNKNOWN)
+
+  /// 題目標籤（使用者自由輸入，如：陣列、DP、字串處理等）
+  tags String[] @default([])
+
+  /// 題目支援語言列表（多選）
+  allowedLanguages ProgrammingLanguage[]
+
+  /// 是否允許顯示 stdout
+  canViewStdout Boolean @default(true)
+
+  /// 題目內容（原始欄位，保留向下相容）
+  title       String
+  description String
+  input       String
+  output      String
+  hint        String?
+
+  /// 雙語欄位
+  titleZh       String?
+  titleEn       String?
+  descriptionZh String?
+  descriptionEn String?
+  inputZh       String?
+  inputEn       String?
+  outputZh      String?
+  outputEn      String?
+  hintZh        String?
+  hintEn        String?
+  tagsZh        String[] @default([])
+  tagsEn        String[] @default([])
+
+  /// 原始語言 ('zh' | 'en')
+  sourceLanguage String @default("zh")
+
+  /// 翻譯狀態
+  translationStatus TranslationStatus @default(NONE)
+  translationError  String?
+  lastTranslatedAt  DateTime?
+
+  /// 範例 I/O
+  sampleInputs  String[]
+  sampleOutputs String[]
+
+  /// Pipeline 相關設定
+  submissionType SubmissionType @default(SINGLE_FILE)
+
+  /// Pipeline 配置（JSON）：定義評測流程的各個階段
+  /// 格式範例：[{type: "COMPILE", config: {...}}, {type: "EXECUTE", config: {...}}]
+  pipelineConfig Json?
+
+  /// 自訂 Checker 腳本在 MinIO 的路徑（選用）
+  checkerKey String?
+
+  /// 自訂 Checker 的程式語言
+  checkerLanguage ProgrammingLanguage?
+
+  /// 函式模板在 MinIO 的路徑（用於 FUNCTION_ONLY 類型）
+  templateKey String?
+
+  /// 老師提供的 Makefile 在 MinIO 的路徑（用於 MULTI_FILE 類型）
+  makefileKey String?
+
+  /// 需要收集的產物列表（相對路徑，用於除錯）
+  artifactPaths String[]
+
+  /// 網路設定（JSON）
+  /// 格式：{enabled: boolean, rules: [...], sidecarImage?: string}
+  networkConfig Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  homeworkLinks      HomeworkProblem[]
+  courses            CourseProblem[]
+  submissions        Submission[]
+  testdata           ProblemTestdata[]
+  aiConversations    AiConversation[]
+  copycatReports     CopycatReport[]
+  blockedSubmissions BlockedSubmission[]
+
+  @@index([ownerId])
+  @@index([visibility])
+  @@index([difficulty])
+}
+
+model CourseProblem {
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId Int
+
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problemId String
+
+  quota Int @default(-1)
+
+  addedBy   User? @relation(fields: [addedById], references: [id], onDelete: SetNull)
+  addedById Int?
+
+  addedAt DateTime @default(now())
+
+  @@id([courseId, problemId])
+  @@index([problemId])
+  @@index([courseId, addedAt])
+}
+
+model Homework {
+  id String @id @default(cuid())
+
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId Int
+
+  title       String
+  description String
+
+  startAt DateTime
+  endAt   DateTime
+
+  createdBy   User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdById Int?
+
+  problems    HomeworkProblem[]
+  submissions Submission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([courseId, startAt, endAt])
+}
+
+model HomeworkProblem {
+  homework   Homework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  homeworkId String
+
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Restrict)
+  problemId String
+
+  order Int
+
+  /// 作業情境下覆蓋允許語言（只允許 Problem.allowedLanguages 的子集合）；null 表示沿用題目設定
+  /// 空陣列表示沿用題目設定
+  allowedLanguagesOverride ProgrammingLanguage[] @default([])
+
+  @@id([homeworkId, problemId])
+  @@index([homeworkId, order])
+  @@index([problemId])
+}
+
+model AiGlobalConfig {
+  id            Int      @id @default(1)
+  forceDisabled Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model AiFeatureConfig {
+  feature         AiFeature       @id
+  provider        AiProvider
+  model           String
+  reasoningEffort ReasoningEffort @default(NONE)
+  maxOutputTokens Int             @default(512)
+  temperature     Float           @default(0.4)
+  enabled         Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model AiConversation {
+  id        String   @id @default(cuid())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problemId String?
+  problem   Problem? @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+
+  messages AiMessage[]
+
+  @@index([userId, problemId])
+  @@index([userId])
+  @@index([problemId])
+}
+
+model AiMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           AiMessageRole
+  content        String
+  safetyFlags    Json?
+  createdAt      DateTime       @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model AiUsageLog {
+  id           String   @id @default(cuid())
+  provider     String
+  model        String
+  inputTokens  Int?
+  outputTokens Int?
+  latencyMs    Int?
+  success      Boolean  @default(true)
+  errorCode    String?
+  createdAt    DateTime @default(now())
+
+  userId         Int?
+  problemId      String?
+  conversationId String?
+
+  @@index([userId, createdAt])
+  @@index([problemId, createdAt])
+  @@index([conversationId, createdAt])
+}
+
+/// AI Rate Limit 封鎖記錄（用於防濫用）
+model AiRateLimitBan {
+  id         String   @id @default(cuid())
+  /// 識別碼格式："ip:{ip}" | "device:{fingerprint}" | "combo:{ip}:{fingerprint}"
+  identifier String   @unique
+  /// 封鎖原因
+  reason     String
+  /// 關聯使用者（可選）
+  userId     Int?
+  /// 封鎖開始時間
+  bannedAt   DateTime @default(now())
+  /// 封鎖結束時間
+  expiresAt  DateTime
+
+  @@index([expiresAt])
+  @@index([identifier])
+}
+
+/// AI 安全檢查封鎖的提交紀錄
+model BlockedSubmission {
+  id        String @id @default(cuid())
+
+  /// 提交者
+  userId Int?
+  user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  /// 題目（可選）
+  problemId String?
+  problem   Problem? @relation(fields: [problemId], references: [id], onDelete: SetNull)
+
+  /// 來源類型
+  sourceType BlockedSourceType
+
+  /// 程式語言
+  language ProgrammingLanguage
+
+  /// 原始碼（截斷至 10000 字元）
+  sourceTrunc String @db.Text
+
+  /// AI 檢測到的威脅類型
+  threatType String
+
+  /// AI 回傳的封鎖原因（給學生看）
+  reason String
+
+  /// AI 回傳的詳細分析（給管理員看）
+  analysis String?
+
+  /// AI 回應的原始 JSON
+  aiResponse Json?
+
+  /// AI 使用量
+  inputTokens  Int?
+  outputTokens Int?
+  latencyMs    Int?
+
+  /// 請求資訊
+  ip        String?
+  userAgent String?
+
+  /// 考試 ID（如果是考試提交）
+  examId String? @db.VarChar(10)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([threatType, createdAt])
+  @@index([createdAt])
+}
+
+model Submission {
+  id String @id @default(cuid())
+
+  userId Int?
+  user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  problemId String
+  problem   Problem @relation(fields: [problemId], references: [id])
+
+  courseId Int?
+  course   Course? @relation(fields: [courseId], references: [id])
+
+  homeworkId String?
+  homework   Homework? @relation(fields: [homeworkId], references: [id])
+
+  examId String? @db.VarChar(10)
+  exam   Exam?   @relation(fields: [examId], references: [id])
+
+  language ProgrammingLanguage
+  status   SubmissionStatus    @default(PENDING)
+
+  score    Int?
+  rawScore Int?
+
+  sourceKey       String
+  compileLog      String?
+  summary         Json?
+  testdataVersion Int     @default(1)
+
+  /// Pipeline 執行結果
+  pipelineResults Json? // 各階段的執行詳情
+
+  /// 收集的產物在 MinIO 的路徑（zip 檔）
+  artifactsKey String?
+
+  ip        String?
+  userAgent String?
+
+  createdAt DateTime  @default(now())
+  judgedAt  DateTime?
+
+  cases        SubmissionCase[]
+  stageResults PipelineStageResult[]
+
+  @@index([userId, createdAt])
+  @@index([problemId, createdAt])
+  @@index([courseId, createdAt])
+  @@index([homeworkId, createdAt])
+  @@index([examId, userId])
+}
+
+model SubmissionCase {
+  id String @id @default(cuid())
+
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  caseNo              Int
+  name                String?
+  status              SubmissionStatus
+  timeMs              Int?
+  memoryKb            Int?
+  stdoutTrunc         String?
+  stderrTrunc         String?
+  expectedOutputTrunc String?
+  points              Int?
+  isSample            Boolean          @default(false)
+
+  @@index([submissionId, caseNo])
+}
+
+/// 記錄 Pipeline 每個階段的執行結果
+model PipelineStageResult {
+  id String @id @default(cuid())
+
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  /// 階段類型
+  stageType PipelineStageType
+
+  /// 階段順序（從 0 開始）
+  order Int
+
+  /// 階段狀態（AC=成功, 其他=失敗原因）
+  status SubmissionStatus
+
+  /// 執行時間（毫秒）
+  timeMs Int?
+
+  /// 記憶體用量（KB）
+  memoryKb Int?
+
+  /// 標準輸出（截斷）
+  stdoutTrunc String?
+
+  /// 標準錯誤（截斷）
+  stderrTrunc String?
+
+  /// 階段詳細資訊（JSON）
+  /// 例如：靜態分析的錯誤列表、checker 的評語等
+  details Json?
+
+  /// 執行時間戳
+  executedAt DateTime @default(now())
+
+  @@index([submissionId, order])
+  @@index([submissionId, stageType])
+}
+
+model ProblemTestdata {
+  id String @id @default(cuid())
+
+  problemId String
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  version    Int
+  zipKey     String
+  manifest   Json
+  isActive   Boolean  @default(false)
+  uploadedAt DateTime @default(now())
+
+  uploadedBy   User? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedById Int?
+
+  @@unique([problemId, version])
+  @@index([problemId, uploadedAt])
+  @@index([problemId, isActive])
+}
+
+/// 抄襲偵測報告（每個課程+題目組合只保留最新一份）
+model CopycatReport {
+  id String @id @default(cuid())
+
+  /// 課程（必填，Copycat 只在課程情境下使用）
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId Int
+
+  /// 題目
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problemId String
+
+  /// 報告狀態
+  status CopycatStatus @default(PENDING)
+
+  /// 分析的學生數
+  studentCount Int @default(0)
+
+  /// 分析的提交數（各語言加總）
+  submissionCount Int @default(0)
+
+  /// 報告摘要（JSON）
+  /// {
+  ///   languages: ["CPP", "PYTHON"],
+  ///   avgSimilarity: 0.15,
+  ///   maxSimilarity: 0.85,
+  ///   suspiciousPairCount: 3  // similarity >= 0.5 的數量
+  /// }
+  summary Json?
+
+  /// 報告檔案（MinIO key）- 完整 Dolos 輸出（zip）
+  reportKey String?
+
+  /// 錯誤訊息（若失敗）
+  errorMessage String?
+
+  /// 請求者
+  requestedBy   User? @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  requestedById Int?
+
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  /// 相似配對列表
+  pairs CopycatPair[]
+
+  @@unique([courseId, problemId])
+  @@index([courseId])
+  @@index([problemId])
+  @@index([status])
+}
+
+/// 相似配對（儲存每對學生的相似度，方便查詢/篩選）
+model CopycatPair {
+  id String @id @default(cuid())
+
+  report   CopycatReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reportId String
+
+  /// 左側學生
+  leftUser   User? @relation("CopycatPairLeft", fields: [leftUserId], references: [id], onDelete: SetNull)
+  leftUserId Int?
+
+  /// 左側提交 ID
+  leftSubmissionId String?
+
+  /// 右側學生
+  rightUser   User? @relation("CopycatPairRight", fields: [rightUserId], references: [id], onDelete: SetNull)
+  rightUserId Int?
+
+  /// 右側提交 ID
+  rightSubmissionId String?
+
+  /// 程式語言
+  language ProgrammingLanguage
+
+  /// 相似度 (0.0 ~ 1.0)
+  similarity Float
+
+  /// 最長相似片段長度（tokens）
+  longestFragment Int @default(0)
+
+  /// 總相似 tokens 數
+  totalOverlap Int @default(0)
+
+  /// 相似片段詳情（JSON）
+  /// [{ leftStart, leftEnd, rightStart, rightEnd, tokens }]
+  fragments Json?
+
+  @@index([reportId, similarity])
+  @@index([leftUserId])
+  @@index([rightUserId])
+}
+
+/// 系統設定（單例）
+model SystemConfig {
+  id                        Int       @id @default(1)
+  siteName                  String    @default("NOJ Team4")
+  faviconKey                String?
+
+  // 註冊功能控制
+  registrationEnabled       Boolean   @default(true)
+  registrationDisabledUntil DateTime?
+
+  // Email 發送功能控制
+  emailSendingEnabled       Boolean   @default(true)
+  emailSendingDisabledUntil DateTime?
+
+  // Email Rate Limit 設定 (null = 使用環境變數或預設值)
+  // 驗證信
+  emailRlVerifyTtl          Int?
+  emailRlVerifyToLimit      Int?
+  emailRlVerifyIpLimit      Int?
+  // 密碼重設信
+  emailRlResetTtl           Int?
+  emailRlResetToLimit       Int?
+  emailRlResetIpLimit       Int?
+  // 全域 IP 限制
+  emailRlGlobalIpTtl        Int?
+  emailRlGlobalIpLimit      Int?
+
+  aiForceDisabledUntil      DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+}
+
+/// 管理員操作紀錄
+model AdminActionLog {
+  id         Int      @id @default(autoincrement())
+  adminId    Int?
+  admin      User?    @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  action     String   // FORCE_VERIFY_USER, UPDATE_SYSTEM_CONFIG, etc.
+  targetType String?  // User, SystemConfig, etc.
+  targetId   Int?
+  details    Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
+}
+
+/// 允許的 Email 網域（白名單）
+/// 註冊時會優先檢查此清單，若在此清單中則允許註冊
+/// 支援精確匹配（如 gmail.com）和後綴匹配（如 *.edu.tw）
+model AllowedEmailDomain {
+  id        Int      @id @default(autoincrement())
+  /// 網域（小寫），可以是精確網域（gmail.com）或後綴模式（*.edu.tw）
+  domain    String   @unique
+  /// 說明（方便管理者識別）
+  note      String?
+  /// 是否啟用
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled])
+}
+
+/// 封鎖的 Email 網域（黑名單）
+/// 用於手動新增的封鎖網域（補充 disposable_email_blocklist.conf）
+model BlockedEmailDomain {
+  id        Int      @id @default(autoincrement())
+  /// 網域（小寫）
+  domain    String   @unique
+  /// 說明（如：發現有人使用此網域進行垃圾註冊）
+  note      String?
+  /// 是否啟用
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enabled])
+}
+
+// ============================================
+// 考試系統（Contest System）
+// ============================================
+
+/// 考試（由 Teacher/TA 在課程中建立的一次性考試活動）
+model Exam {
+  /// 10 字元 ID（小寫英數：abcdefghijklmnopqrstuvwxyz0123456789）
+  id String @id @db.VarChar(10)
+
+  /// 所屬課程
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId Int
+
+  /// 考試標題
+  title String
+
+  /// 考試說明（Markdown 格式）
+  description String?
+
+  /// 包含的題目 ID 列表（有序，對應 Problem.id）
+  problemIds String[]
+
+  /// 考試開始時間
+  startsAt DateTime
+
+  /// 考試結束時間
+  endsAt DateTime
+
+  /// IP 白名單（CIDR 格式，如 ["140.114.0.0/16"]，空陣列表示不限制）
+  ipAllowList String[] @default([])
+
+  /// 是否顯示即時排行榜
+  scoreboardVisible Boolean @default(false)
+
+  /// 建立者
+  createdBy   User? @relation("ExamCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// 考試登入代碼列表
+  codes ExamCode[]
+
+  /// 考試提交紀錄（透過 Submission.examId 關聯）
+  submissions Submission[]
+
+  @@index([courseId, startsAt])
+  @@index([createdById])
+}
+
+/// 考試登入代碼（發給每位學生的一次性代碼）
+model ExamCode {
+  /// 6 字元代碼（大寫英數，排除易混淆字元：ABCDEFGHJKLMNPQRSTUVWXYZ23456789）
+  code String @id @db.VarChar(6)
+
+  /// 所屬考試
+  exam   Exam   @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examId String @db.VarChar(10)
+
+  /// 對應學生（課程成員）
+  student   User? @relation("ExamCodeStudent", fields: [studentId], references: [id], onDelete: SetNull)
+  studentId Int?
+
+  /// 首次使用時間
+  usedAt DateTime?
+
+  /// 首次使用的 IP
+  usedIp String?
+
+  /// Session Token（登入後產生，用於驗證後續請求）
+  sessionToken String? @unique
+
+  createdAt DateTime @default(now())
+
+  /// 每位學生在每場考試只能有一個代碼
+  @@unique([examId, studentId])
+  @@index([examId])
+  @@index([sessionToken])
+}

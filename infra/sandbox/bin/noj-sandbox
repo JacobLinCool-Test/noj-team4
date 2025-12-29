@@ -1,0 +1,315 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+die() {
+  echo "noj-sandbox: $*" >&2
+  exit 2
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
+}
+
+require_cmd nsjail
+
+workdir="${NOJ_SANDBOX_WORKDIR:-/work}"
+src_dir="${workdir}/src"
+build_dir="${workdir}/build"
+out_dir="${workdir}/out"
+
+# Note: Directories are pre-created in Dockerfile and bind-mounted by Docker
+# No mkdir needed here (and would fail with --read-only)
+
+if [[ $# -lt 1 ]]; then
+  die "usage: noj-sandbox <compile|run|lint|script> <C|CPP|JAVA|PYTHON> [options]"
+fi
+
+mode="$1"
+shift
+lang="$1"
+shift
+
+case "${lang}" in
+  C|CPP|JAVA|PYTHON) ;;
+  *) die "unsupported language: ${lang}" ;;
+esac
+
+realpath_m() {
+  # coreutils realpath supports -m on Ubuntu; fall back to python if needed.
+  if realpath -m / >/dev/null 2>&1; then
+    realpath -m "$1"
+  else
+    python3 - <<'PY' "$1"
+import os, sys
+print(os.path.realpath(sys.argv[1]))
+PY
+  fi
+}
+
+require_under_workdir() {
+  local p
+  p="$(realpath_m "$1")"
+  case "${p}" in
+    "${workdir}"/*) echo "${p}" ;;
+    *) die "path must be under ${workdir}: ${p}" ;;
+  esac
+}
+
+as_seconds_float() {
+  local ms="$1"
+  python3 - <<'PY' "${ms}"
+import sys
+ms = int(sys.argv[1])
+print(f"{ms/1000:.3f}")
+PY
+}
+
+as_seconds_int_ceiling() {
+  local ms="$1"
+  python3 - <<'PY' "${ms}"
+import math, sys
+ms = int(sys.argv[1])
+print(int(math.ceil(ms/1000)))
+PY
+}
+
+# Check if nsjail should be used
+# In Docker containers, nsjail requires special configuration and may not work well
+# Docker already provides strong isolation (namespaces, cgroups, seccomp)
+# So we default to ulimit+timeout unless NOJ_USE_NSJAIL is explicitly set
+should_use_nsjail() {
+  # Only use nsjail if explicitly enabled via environment variable
+  [[ "${NOJ_USE_NSJAIL:-0}" == "1" ]]
+}
+
+# Run command with resource limits
+# Docker provides the first layer of isolation (namespaces, read-only fs, network none)
+# We add ulimit + timeout as the second layer of defense
+run_sandboxed() {
+  local time_limit_ms="$1"
+  local memory_limit_kb="$2"
+  local nofile_limit="$3"
+  local nproc_limit="$4"
+  local skip_memory_limit="${5:-0}"  # "1" to skip ulimit -v (for Java)
+  shift 5 2>/dev/null || shift 4
+
+  local time_limit_s
+  time_limit_s="$(as_seconds_int_ceiling "${time_limit_ms}")"
+
+  local cpu_limit_s
+  cpu_limit_s="$((time_limit_s + 1))"
+
+  # Use ulimit + timeout (safe and stable in Docker)
+  # Docker already provides namespace isolation, so this is sufficient
+  run_with_ulimit "${time_limit_s}" "${cpu_limit_s}" "${memory_limit_kb}" "${nofile_limit}" "${nproc_limit}" "${skip_memory_limit}" "$@"
+}
+
+# Run with ulimit and timeout
+# Note: For Java, ulimit -v is problematic because JVM needs to reserve large virtual address spaces
+# Docker already provides memory limits, so we skip ulimit -v for Java and use JVM flags instead
+run_with_ulimit() {
+  local time_limit_s="$1"
+  local cpu_limit_s="$2"
+  local memory_limit_kb="$3"
+  local nofile_limit="$4"
+  local nproc_limit="$5"
+  local skip_memory_limit="$6"  # "1" to skip ulimit -v (for Java)
+  shift 6
+
+  (
+    # Resource limits
+    if [[ "${skip_memory_limit}" != "1" ]]; then
+      ulimit -v "${memory_limit_kb}" 2>/dev/null || true  # Virtual memory
+    fi
+    ulimit -t "${cpu_limit_s}" 2>/dev/null || true      # CPU time
+    ulimit -n "${nofile_limit}" 2>/dev/null || true     # Open files
+    ulimit -u "${nproc_limit}" 2>/dev/null || true      # Max processes (防止 fork bomb)
+    ulimit -c 0 2>/dev/null || true                     # No core dumps
+    exec timeout --signal=KILL "${time_limit_s}s" "$@"
+  )
+}
+
+# Default limits
+compile_time_limit_ms="${NOJ_SANDBOX_COMPILE_TIME_LIMIT_MS:-30000}"
+compile_memory_limit_kb="${NOJ_SANDBOX_COMPILE_MEMORY_LIMIT_KB:-1048576}" # 1024 MiB
+run_time_limit_ms_default="${NOJ_SANDBOX_RUN_TIME_LIMIT_MS:-5000}"
+run_memory_limit_kb_default="${NOJ_SANDBOX_RUN_MEMORY_LIMIT_KB:-262144}" # 256 MiB
+nofile_limit="${NOJ_SANDBOX_NOFILE_LIMIT:-256}"
+nproc_limit="${NOJ_SANDBOX_NPROC_LIMIT:-10}"  # 限制進程數防止 fork bomb
+output_limit_bytes="${NOJ_SANDBOX_OUTPUT_LIMIT_BYTES:-262144}" # 256 KiB per file
+
+case "${mode}" in
+  compile)
+    case "${lang}" in
+      PYTHON)
+        # Syntax check only - compile in memory without creating .pyc files
+        run_sandboxed "${compile_time_limit_ms}" "${compile_memory_limit_kb}" "${nofile_limit}" "${nproc_limit}" "0" \
+          python3 -c "compile(open('${src_dir}/main.py').read(), 'main.py', 'exec')"
+        exit 0
+        ;;
+      C)
+        run_sandboxed "${compile_time_limit_ms}" "${compile_memory_limit_kb}" "${nofile_limit}" "${nproc_limit}" "0" \
+          gcc -O2 -std=c11 -o "${build_dir}/main" "${src_dir}/main.c"
+        exit 0
+        ;;
+      CPP)
+        run_sandboxed "${compile_time_limit_ms}" "${compile_memory_limit_kb}" "${nofile_limit}" "${nproc_limit}" "0" \
+          g++ -O2 -std=c++17 -o "${build_dir}/main" "${src_dir}/main.cpp"
+        exit 0
+        ;;
+      JAVA)
+        # Java: skip ulimit -v because JVM needs large virtual address space
+        # Docker memory limits provide sufficient protection
+        run_sandboxed "${compile_time_limit_ms}" "${compile_memory_limit_kb}" "${nofile_limit}" "${nproc_limit}" "1" \
+          javac -d "${build_dir}" "${src_dir}/Main.java"
+        exit 0
+        ;;
+    esac
+    ;;
+  compile-make)
+    # Makefile-based compilation for multi-file projects
+    # Check if Makefile exists in src directory
+    if [[ ! -f "${src_dir}/Makefile" ]] && [[ ! -f "${src_dir}/makefile" ]]; then
+      die "Makefile not found in ${src_dir}"
+    fi
+
+    # Run make in the src directory
+    cd "${src_dir}"
+    run_sandboxed "${compile_time_limit_ms}" "${compile_memory_limit_kb}" "${nofile_limit}" "${nproc_limit}" "0" \
+      make
+
+    # Check if the executable was created
+    # Try to find common output names: main, a.out, or the first executable file
+    executable=""
+    for candidate in main a.out; do
+      if [[ -x "${src_dir}/${candidate}" ]]; then
+        executable="${src_dir}/${candidate}"
+        break
+      fi
+    done
+
+    # If not found, try to find any executable file in src_dir
+    if [[ -z "${executable}" ]]; then
+      executable=$(find "${src_dir}" -maxdepth 1 -type f -executable -print -quit 2>/dev/null || true)
+    fi
+
+    # Move the executable to build_dir for consistent execution
+    if [[ -n "${executable}" ]] && [[ -f "${executable}" ]]; then
+      cp "${executable}" "${build_dir}/main"
+      chmod +x "${build_dir}/main"
+    else
+      die "make succeeded but no executable was produced"
+    fi
+
+    exit 0
+    ;;
+  lint)
+    # Lint mode: run linter tools and output JSON results
+    lint_output_file="${out_dir}/lint.json"
+
+    case "${lang}" in
+      PYTHON)
+        # Run pylint with JSON output
+        run_sandboxed "${compile_time_limit_ms}" "${compile_memory_limit_kb}" "${nofile_limit}" "${nproc_limit}" "0" \
+          pylint --output-format=json --exit-zero "${src_dir}/main.py" > "${lint_output_file}" 2>&1 || true
+        exit 0
+        ;;
+      C)
+        # Run clang-tidy with JSON output
+        run_sandboxed "${compile_time_limit_ms}" "${compile_memory_limit_kb}" "${nofile_limit}" "${nproc_limit}" "0" \
+          clang-tidy "${src_dir}/main.c" --quiet -- -std=c11 > "${lint_output_file}" 2>&1 || true
+        exit 0
+        ;;
+      CPP)
+        # Run clang-tidy with JSON output
+        run_sandboxed "${compile_time_limit_ms}" "${compile_memory_limit_kb}" "${nofile_limit}" "${nproc_limit}" "0" \
+          clang-tidy "${src_dir}/main.cpp" --quiet -- -std=c++17 > "${lint_output_file}" 2>&1 || true
+        exit 0
+        ;;
+      JAVA)
+        # Java linting not supported yet - output empty JSON array
+        echo "[]" > "${lint_output_file}"
+        exit 0
+        ;;
+    esac
+    ;;
+  script)
+    # Script mode: run a custom script with input from file and output to file
+    # Used for custom scoring scripts, checkers, etc.
+    script_file="${src_dir}/script.py"
+    input_file="${src_dir}/input.json"
+    output_file="${out_dir}/output.json"
+    stderr_file="${out_dir}/script-stderr.txt"
+
+    if [[ ! -f "${script_file}" ]]; then
+      die "script file not found: ${script_file}"
+    fi
+
+    # Run the script with proper limits
+    exec 1>"${output_file}" 2>"${stderr_file}"
+    run_sandboxed "${compile_time_limit_ms}" "${compile_memory_limit_kb}" "${nofile_limit}" "${nproc_limit}" "0" \
+      python3 "${script_file}" < "${input_file}"
+    ;;
+  run)
+    time_limit_ms="${run_time_limit_ms_default}"
+    memory_limit_kb="${run_memory_limit_kb_default}"
+    stdout_file="${out_dir}/stdout.txt"
+    stderr_file="${out_dir}/stderr.txt"
+
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --time-limit-ms)
+          time_limit_ms="$2"
+          shift 2
+          ;;
+        --memory-limit-kb)
+          memory_limit_kb="$2"
+          shift 2
+          ;;
+        --stdout-file)
+          stdout_file="$2"
+          shift 2
+          ;;
+        --stderr-file)
+          stderr_file="$2"
+          shift 2
+          ;;
+        --)
+          shift
+          break
+          ;;
+        *)
+          die "unknown option: $1"
+          ;;
+      esac
+    done
+
+    stdout_file="$(require_under_workdir "${stdout_file}")"
+    stderr_file="$(require_under_workdir "${stderr_file}")"
+
+    mkdir -p "$(dirname "${stdout_file}")" "$(dirname "${stderr_file}")"
+
+    # Enforce per-file output cap at the OS level (prevents Docker streaming huge logs to the host).
+    # ulimit -f is in 512-byte blocks.
+    ulimit -f "$(((output_limit_bytes + 511) / 512))"
+
+    cmd=()
+    skip_memory_limit="0"
+    xmx_mb=$((memory_limit_kb / 1024))  # Pre-calculate for Java
+    case "${lang}" in
+      PYTHON) cmd=(python3 "${src_dir}/main.py") ;;
+      C|CPP) cmd=("${build_dir}/main") ;;
+      JAVA)
+        # Java: use -Xmx to limit heap instead of ulimit -v
+        cmd=(java -Xmx${xmx_mb}m -cp "${build_dir}" Main)
+        skip_memory_limit="1"
+        ;;
+    esac
+
+    exec 1>"${stdout_file}" 2>"${stderr_file}"
+    run_sandboxed "${time_limit_ms}" "${memory_limit_kb}" "${nofile_limit}" "${nproc_limit}" "${skip_memory_limit}" "${cmd[@]}"
+    ;;
+  *)
+    die "unknown mode: ${mode}"
+    ;;
+esac
